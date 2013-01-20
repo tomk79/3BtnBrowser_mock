@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja">
+	<head>
+		<meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+		<meta http-equiv="content-script-type" content="text/javascript" />
+		<meta http-equiv="content-style-type" content="text/css" />
+		<title>information | 3BTN BROWSER</title>
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="format-detection" content="telephone=no" />
+		<meta name="viewport" content="width=device-width; initial-scale=1.0; minimum-scale=1; maximum-scale=1;" />
+		<link rel="stylesheet" type="text/css" href="common/css/content.css" />
+	</head>
+	<body>
+		<h1>information</h1>
+		<div id="content" class="base_pcontent">
+
+			<p>『<strong>1行分の文字列を表示できるスペースのモノクロディスプレイと、3つのボタンさえあれば、ウェブ標準に従って実装されたウェブページを閲覧することは可能である</strong>』</p>
+			<p>&quot;3BTN BROWSER&quot; は、この仮説に基づいて作られた、架空の3ボタン端末のエミュレータです。ウェブ標準に沿ったHTMLコンテンツが、どれほど多様なクライアントに対応し得るのか、想像してみてください。</p>
+
+			<div class="linklist">
+				<ul>
+					<li><a href="http://www.pxt.jp/ja/service/3btn/index.html" onclick="window.open(this.href);return false;">より詳細な情報</a></li>
+					<li><a href="http://www.pxt.jp/" onclick="window.open(this.href);return false;">作ったひと</a></li>
+				</ul>
+			</div>
+			<h2>技術情報</h2>
+			<ul>
+				<li>JavaScriptは動作しません。</li>
+				<li>CSSは完全に無視しています。</li>
+			</ul>
+		</div>
+		<div id="blockBottom">
+			<ul>
+				<li><a href="./index.html">戻る</a></li>
+			</ul>
+		</div>
+	</body>
+</html>

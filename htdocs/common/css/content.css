@@ -1,0 +1,32 @@
+@charset "UTF-8";
+
+.base_pcontent{
+	text-align:left;
+	padding:0px 0px 0px 0px;
+	margin:0px 0px 0px 0px;
+	color:#333333;
+}
+.base_pcontent .center{
+	text-align:center;
+}
+.base_pcontent a{
+	color:#000000;
+}
+.base_pcontent a:hover{
+	color:#999999;
+}
+
+/* .linklist */
+.base_pcontent .linklist{
+}
+.base_pcontent .linklist ul{
+	padding:0px;
+}
+.base_pcontent .linklist ul li{
+	list-style-type:none;
+	padding:0px;
+}
+.base_pcontent .linklist ul li a{
+	padding-left:13px;
+	background:url("../img/pointer/pointer_001.png") no-repeat center left;
+}
