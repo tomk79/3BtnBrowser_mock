@@ -2,10 +2,10 @@
 
 ###################################################################################################################
 #
-#	PxHTTPAccess 1.0.1
+#	PxHTTPAccess 1.0.5
 #			(HTTPアクセスオブジェクト)
 #			Copyright (C)Tomoya Koyanagi, All rights reserved.
-#			LastUpdate : 0:06 2009/09/20
+#			LastUpdate : 2013/9/7
 #	--------------------------------------
 #	このライブラリは、ネットワークを経由したHTTP通信でコンテンツを取得するクラスです。
 #	OpenSSLがインストールされている環境では、HTTPSも利用可能です。
@@ -33,7 +33,7 @@ class PxHTTPAccess{
 	var $http_post_data = null;//POSTメソッドで送信するデータ
 	var $http_user_agent = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)';//ユーザエージェント文字列
 	var $http_referer = null;//リファラを送信する
-	var $http_basic_auth_user = array('user'=>null,'passwd'=>null);//ベーシック認証
+	var $http_authorization = array('type'=>null,'user'=>null,'passwd'=>null);//ベーシック認証, PxHTTPAccess 1.0.2 : Digest認証を追加,プロパティ名変更
 	var $http_request_header_ext = null;//追加するリクエストヘッダ
 	var $cookies = array();//クッキーの記憶
 	#	/ 要求ヘッダ
@@ -54,7 +54,10 @@ class PxHTTPAccess{
 	var $http_response_redirect_to = null;//リダイレクト先URLのメモ
 	var $http_response_time = null;//リクエストから受信完了までにかかった時間(microtime)
 	var $http_response_transfer_encoding = null;//HTTP1.1 Transfer-Encoding の値
+	var $http_response_last_modified = null;//HTTP1.1 Last-Modified の値 (PxHTTPAccess 1.0.2 追加)
 	var $http_response_connection = null;//Connection の値
+	var $http_response_www_authenticate = array();//WWW-Authenticate の値 PxHTTPAccess 1.0.2 追加
+	var $http_response_all = array();//その他のヘッダー情報を仕舞っておく器 PxHTTPAccess 1.0.3 追加
 	#	/ 応答ヘッダ：アクセス結果のメモ
 	#--------------------------------------
 
@@ -118,14 +121,30 @@ class PxHTTPAccess{
 		$this->http_method = 'GET';
 		$this->http_post_data = null;
 		$this->http_referer = null;
-		$this->http_basic_auth_user = array('user'=>null,'passwd'=>null);
+		$this->http_authorization = array('type'=>null,'user'=>null,'passwd'=>null);
 		$this->http_request_header_ext = null;
 		return true;
 	}
 
 	#	基本認証情報
-	function set_auth_user( $user_name )	{ $this->http_basic_auth_user['user'] = $user_name; return true; }
-	function set_auth_pw( $passwd )			{ $this->http_basic_auth_user['passwd'] = $passwd; return true; }
+	function set_auth_type( $type_name ){
+		//PxHTTPAccess 1.0.2 追加
+		if( !strlen($type_name) ){
+			$this->http_authorization['type'] = null;
+			return true;
+		}
+		switch( strtolower( $type_name ) ){
+			case 'basic':
+			case 'digest':
+				break;
+			default:
+				return false;
+		}
+		$this->http_authorization['type'] = $type_name;
+		return true;
+	}
+	function set_auth_user( $user_name )	{ $this->http_authorization['user'] = $user_name; return true; }
+	function set_auth_pw( $passwd )			{ $this->http_authorization['passwd'] = $passwd; return true; }
 
 	#	リダイレクト関連
 	function set_auto_redirect_flg( $bool ){
@@ -162,6 +181,12 @@ class PxHTTPAccess{
 	function get_redirect_to()				{ return $this->http_response_redirect_to; }
 	function get_response_time()			{ return floatval( $this->http_response_time ); }
 	function get_transfer_encoding()		{ return $this->http_response_transfer_encoding; }
+	function get_last_modified()			{ return $this->http_response_last_modified; }//PxHTTPAccess 1.0.2 追加
+	function get_last_modified_timestamp()	{//PxHTTPAccess 1.0.2 追加
+		if( !strlen( $this->http_response_last_modified ) ){ return null; }
+		return strtotime( $this->http_response_last_modified );
+	}
+	function get_response( $key )			{ return $this->http_response_all[strtolower($key)]; }//PxHTTPAccess 1.0.3 追加
 	function get_socket_open_error_num()	{ return $this->socket_open_error_num; }
 	function get_socket_open_error_msg()	{ return $this->socket_open_error_msg; }
 	function get_socket_open_error(){
@@ -202,7 +227,7 @@ class PxHTTPAccess{
 			}
 		}
 		$port = intval( $port );
-		$res = fsockopen( $host , $port , $this->socket_open_error_num , $this->socket_open_error_msg , 10 );
+		$res = @fsockopen( $host , $port , $this->socket_open_error_num , $this->socket_open_error_msg , 10 );
 		if( !is_resource( $res ) ){
 			return	false;
 		}
@@ -232,12 +257,45 @@ class PxHTTPAccess{
 		}
 
 		$RTN = '';
-		$RTN  = $this->get_method().' '.$request_path.' HTTP/1.1'."\r\n";
+		$RTN .= $this->get_method().' '.$request_path.' HTTP/1.1'."\r\n";
 		$RTN .= 'Host: '.$URL_INFO['host']."\r\n";
 		$RTN .= 'User-Agent: '.$this->get_user_agent()."\r\n";
-		if( strlen( $this->http_basic_auth_user['user'] ) && strlen( $this->http_basic_auth_user['passwd'] ) ){
+		if( ( $this->http_authorization['type'] == 'digest' || !$this->http_authorization['type'] && $this->http_response_www_authenticate['type'] == 'digest' ) && strlen( $this->http_authorization['user'] ) && strlen( $this->http_authorization['passwd'] ) && strlen( $this->http_response_www_authenticate['nonce'] ) ){
+			#	ダイジェスト認証
+			$RTN .= 'Authorization: Digest';
+			$RTN .= ' username="'.$this->http_authorization['user'].'",';
+			$RTN .= ' realm="'.$this->http_response_www_authenticate['realm'].'",';
+			$RTN .= ' nonce="'.$this->http_response_www_authenticate['nonce'].'",';
+			$RTN .= ' uri="'.$request_path.'",';
+			$RTN .= ' algorithm='.$this->http_response_www_authenticate['algorithm'].',';
+			$tmp_digest_val_qop = 'auth';//UTODO:←本来は選択式。固定ではダメ。
+			$RTN .= ' qop='.$tmp_digest_val_qop.',';
+			$tmp_digest_val_nc = str_pad( dechex( ++ $this->http_authorization[$this->http_response_www_authenticate['nonce']]['nc'] ) , 8 , '0' , STR_PAD_LEFT );
+			$RTN .= ' nc='.$tmp_digest_val_nc.',';
+			$tmp_digest_val_cnonce = md5( rand(1,99999) );
+			$RTN .= ' cnonce="'.$tmp_digest_val_cnonce.'",';
+			$tmp_a1 = 
+				$this->http_authorization['user'].':'.
+				$this->http_response_www_authenticate['realm'].':'.
+				$this->http_authorization['passwd']
+			;
+			$tmp_a2 = 
+				$this->http_method.':'.
+				$request_path
+			;
+			$RTN .= ' response="'.md5(
+				md5($tmp_a1).':'.
+				$this->http_response_www_authenticate['nonce'].':'.
+				$tmp_digest_val_nc.':'.
+				$tmp_digest_val_cnonce.':'.
+				$tmp_digest_val_qop.':'.
+				md5($tmp_a2)
+			).'"';
+			$RTN .= "\r\n";
+			unset( $tmp_digest_val_nc , $tmp_digest_val_cnonce , $tmp_digest_val_qop );
+		}elseif( ( $this->http_authorization['type'] == 'basic' || !$this->http_authorization['type'] && $this->http_response_www_authenticate['type'] == 'basic' ) && strlen( $this->http_authorization['user'] ) && strlen( $this->http_authorization['passwd'] ) ){
 			#	基本認証
-			$RTN .= 'Authorization: Basic '.base64_encode( $this->http_basic_auth_user['user'].':'.$this->http_basic_auth_user['passwd'] )."\r\n";
+			$RTN .= 'Authorization: Basic '.base64_encode( $this->http_authorization['user'].':'.$this->http_authorization['passwd'] )."\r\n";
 		}
 		if( strlen( $this->http_referer ) ){
 			#	リファラ
@@ -273,7 +331,9 @@ class PxHTTPAccess{
 		$res = &$this->get_connection_resource();
 		if( !is_resource($res) ){ return false; }
 
-		if( !strlen( $request_header ) ){ $request_header = $this->create_http_request_header(); }
+		if( !strlen( $request_header ) ){
+			$request_header = $this->create_http_request_header();
+		}
 
 		fputs( $res , $request_header );
 
@@ -336,7 +396,7 @@ class PxHTTPAccess{
 				$line = fread( $res , $this->fread_length );
 			}else{
 				#	テキストのデータはこっちが速い？
-				$line = fgets( $res );
+				$line = fgets( $res , $this->fread_length );
 			}
 
 			if( $status == 1 || $status == 2 ){
@@ -362,11 +422,10 @@ class PxHTTPAccess{
 					$line = preg_replace( '/^(.{'.intval(strlen($line)-$sabun).'}).*$/si' , "$1" , $line );
 				}
 
-
 				#--------------------------------------
 				#	コンテンツ取り出し
 				$downloaded_content_size += strlen( $line );
-				if( is_file( $save_to_path ) ){
+				if( @is_file( $save_to_path ) ){
 					if( !$this->savefile_push( $save_to_path , $line ) ){
 						#	保存に失敗したらおしまいにする
 						break;
@@ -402,6 +461,10 @@ class PxHTTPAccess{
 				}elseif( preg_match( '/Transfer-Encoding:\s*?([a-z0-9]+)/si' , $line , $matched ) ){
 					#	Transfer-Encoding: chunked
 					$this->http_response_transfer_encoding = strtolower( $matched[1] );
+				}elseif( preg_match( '/Last-Modified:\s*?([a-zA-Z0-9\-\_\,\: ]+)/si' , $line , $matched ) ){
+					#	Last-Modified
+					#	PxHTTPAccess 1.0.2 追加
+					$this->http_response_last_modified = trim( $matched[1] );
 				}elseif( preg_match( '/Connection:\s*?([a-z0-9]+)/si' , $line , $matched ) ){
 					#	Connection: chunked
 					$this->http_response_connection = strtolower( $matched[1] );
@@ -430,7 +493,20 @@ class PxHTTPAccess{
 							$this->http_response_content = $http4redirect->get_http_contents();
 						}
 						$this->clear_response_header();//初期化 23:58 2009/09/19
-						$this->put_response_header( $http4redirect->get_response_header() );
+
+						$this->http_response_header = $http4redirect->http_response_header;
+						$this->http_response_transfer_encoding = $http4redirect->http_response_transfer_encoding;
+						$this->http_response_last_modified = $http4redirect->http_response_last_modified;
+						$this->http_response_version = $http4redirect->http_response_version;
+						$this->http_response_status_cd = $http4redirect->http_response_status_cd;
+						$this->http_response_status_msg = $http4redirect->http_response_status_msg;
+						$this->http_response_content_type = $http4redirect->http_response_content_type;
+						$this->http_response_content_charset = $http4redirect->http_response_content_charset;
+						$this->http_response_content_length = $http4redirect->http_response_content_length;
+						$this->http_response_redirect_to = $http4redirect->http_response_redirect_to;
+						$this->http_response_connection = $http4redirect->http_response_connection;
+						$this->http_response_all = $http4redirect->http_response_all;
+
 						unset( $http4redirect );
 						return	$this->http_response_content;
 					}
@@ -456,16 +532,22 @@ class PxHTTPAccess{
 		#	/ 受け取ったクッキーの処理
 		#--------------------------------------
 
+		#--------------------------------------
+		#	受け取った認証情報の処理
+		$this->parse_www_authenticate( $this->get_response_header() );
+		#	/ 受け取った認証情報の処理
+		#--------------------------------------
+
 		if( is_file( $save_to_path ) ){
 			return	true;
 		}
 
 		return	$this->http_response_content;
-	}
+	}//get_responce();
 
 	#--------------------------------------
 	#	★リクエストを送信して結果を取得する
-	function get_http_contents( $path_save_to = null ){
+	function get_http_contents( $path_save_to = null , $try = 0 ){
 		$URL_INFO = parse_url( $this->get_url() );
 #		if( !strlen( $URL_INFO['port'] ) ){ $URL_INFO['port'] = 80; }
 
@@ -483,8 +565,20 @@ class PxHTTPAccess{
 		}
 
 		$reqult = $this->get_responce( $path_save_to );
-
 		$this->http_disconnect();
+
+		if( !$try && $this->get_status_cd() == '401' &&//←認証に失敗した場合
+			(
+				//↓ダイジェスト認証を求められたら
+				( $this->http_response_www_authenticate['type'] == 'digest' && strlen( $this->http_response_www_authenticate['nonce'] ) )
+				//↓ベーシック認証を求められたら(ユーザが指定していない場合のみ)
+				|| ( $this->http_response_www_authenticate['type'] == 'basic' && !strlen( $this->http_authorization['type'] ) )
+			)
+			&& strlen( $this->http_authorization['user'] ) && strlen( $this->http_authorization['passwd'] )
+		){
+			//ダイジェスト認証で失敗したらもう一度アクセスする//PxHTTPAccess 1.0.2 追加
+			$reqult = $this->get_http_contents( $path_save_to , 1 );
+		}
 
 		return	$reqult;
 	}
@@ -503,6 +597,7 @@ class PxHTTPAccess{
 	function clear_response_header(){
 		$this->http_response_header = null;
 		$this->http_response_transfer_encoding = null;
+		$this->http_response_last_modified = null;//PxHTTPAccess 1.0.2 追加
 		$this->http_response_version = null;
 		$this->http_response_status_cd = null;
 		$this->http_response_status_msg = null;
@@ -511,15 +606,53 @@ class PxHTTPAccess{
 		$this->http_response_content_length = null;
 		$this->http_response_redirect_to = null;
 		$this->http_response_connection = null;
+		$this->http_response_all = array();
 		return	true;
 	}
 	#	応答ヘッダに追記する
 	function put_response_header( $value ){
 		$this->http_response_header .= $value;
+		if( preg_match( '/(.*?):\s*(.*?)(?:\r\n|\r|\n)?$/si' , $value , $matched ) ){
+			#	ヘッダーを記憶
+			$this->http_response_all[strtolower($matched[1])] = trim( $matched[2] );
+		}
 		return	true;
 	}
 
 
+
+	###################################################################################################################
+	#	認証関連操作
+
+	#--------------------------------------
+	#	WWW-Authenticate を解析する
+	function parse_www_authenticate( $http_header_string ){
+		//PxHTTPAccess 1.0.2 追加
+		if( preg_match( '/WWW\-Authenticate\:\s*(.*?)(?:\r\n|\r|\n|$)/si' , $http_header_string , $matched ) ){
+			$value = $matched[1];
+			preg_match( '/^(Basic|Digest)(.*)$/si' , trim($value) , $matched );
+			$this->http_response_www_authenticate['type'] = strtolower( $matched[1] );
+			$value = $matched[2];
+			$tmp = array();
+			while( 1 ){
+				if( !preg_match( '/^(?:\,\s*)?([a-zA-Z0-9\-\_]+)\=(\"?)(.*?)\2((?:\s*\,).*)?$/' , trim($value) , $matched ) ){
+					break;
+				}
+				$tmp[$matched[1]] = $matched[3];
+				$value = $matched[4];
+				continue;
+			}
+
+			$this->http_response_www_authenticate['realm'] = $tmp['realm'];
+			if( $this->http_response_www_authenticate['type'] == 'digest' ){
+				$this->http_response_www_authenticate['nonce'] = $tmp['nonce'];
+				$this->http_response_www_authenticate['algorithm'] = $tmp['algorithm'];
+				$this->http_response_www_authenticate['qop'] = $tmp['qop'];
+			}
+		}
+
+		return	true;
+	}
 
 	###################################################################################################################
 	#	クッキー関連操作
@@ -584,7 +717,6 @@ class PxHTTPAccess{
 		}
 
 		return	true;
-
 	}
 
 	#--------------------------------------

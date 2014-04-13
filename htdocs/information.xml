@@ -1,14 +1,11 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja">
+<!DOCTYPE html>
+<html>
 	<head>
-		<meta http-equiv="content-type" content="text/html;charset=UTF-8" />
-		<meta http-equiv="content-script-type" content="text/javascript" />
-		<meta http-equiv="content-style-type" content="text/css" />
+		<meta charset="UTF-8" />
 		<title>information | 3BTN BROWSER</title>
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="format-detection" content="telephone=no" />
-		<meta name="viewport" content="width=device-width; initial-scale=1.0; minimum-scale=1; maximum-scale=1;" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1, maximum-scale=1" />
 		<link rel="stylesheet" type="text/css" href="common/css/content.css" />
 	</head>
 	<body>
@@ -20,7 +17,6 @@
 
 			<div class="linklist">
 				<ul>
-					<li><a href="http://www.pxt.jp/ja/service/3btn/index.html" onclick="window.open(this.href);return false;">より詳細な情報</a></li>
 					<li><a href="http://www.pxt.jp/" onclick="window.open(this.href);return false;">作ったひと</a></li>
 				</ul>
 			</div>

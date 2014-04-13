@@ -250,9 +250,6 @@ a{
 		margin:0px 0px 0px 0px;
 		padding:0px 0px 0px 0px;
 	}
-	body{
-		background:url("../img/skins/default/bg.gif") no-repeat center center;
-	}
 	.base_logobox{
 		position:absolute; top:10px; left:10px;
 		padding:0px; margin:0px;
@@ -370,14 +367,6 @@ a{
 	.base_blind            { z-index:  300; }
 	.base_addressbar       { z-index:  200; }
 	.base_display_wrapper_1{ z-index:  100; }
-
-	/* skins */
-	body.base_skin_watch{
-		background:#ff9933 url("../img/skins/watch/bg.gif") no-repeat center center;
-	}
-	body.base_skin_warrior{
-		background:#f2f2f2 url("../img/skins/warrior/bg.gif") no-repeat center center;
-	}
 
 }
 
